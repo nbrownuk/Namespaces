@@ -11,7 +11,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Set some variables
-ENV VERSION       6.1
+ENV VERSION       6.2
 ENV TCL_REPO_BASE http://distro.ibiblio.org/tinycorelinux/6.x/x86
 ENV ISO_ROOT      /tmp/iso
 ENV ROOTFS        /rootfs
