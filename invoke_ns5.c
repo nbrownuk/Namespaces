@@ -207,6 +207,7 @@ int main(int argc, char *argv[])
             args.command[i - optind] = malloc(strlen(argv[i]) + 1);
             strcpy(args.command[i - optind], argv[i]);
         }
+        args.command[argc - optind] = NULL;
     }
 
       if (args.verbose)
