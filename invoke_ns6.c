@@ -1,11 +1,10 @@
 #define _GNU_SOURCE
-#include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/mount.h>
+#include <sys/stat.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sched.h>
-#include <signal.h>
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
@@ -130,7 +129,7 @@ int childFunction(void *child_args)
                 exit(EXIT_FAILURE);
             }
             if (access("/proc", F_OK) != 0)
-                if (mkdir("/proc", 0700) == -1) {
+                if (mkdir("/proc", 0555) == -1) {
                     perror(" Child: mkdir");
                     exit(EXIT_FAILURE);
             }
@@ -140,8 +139,9 @@ int childFunction(void *child_args)
     // Mount new proc instance in new mount namespace if and only if
     // the child exists in both a new PID and MNT namespace
     if ((args->flags & CLONE_NEWPID) && (args->flags & CLONE_NEWNS)) {
-        if (mount("none", "/proc", "", MS_REC|MS_PRIVATE, NULL) == -1)
-            perror(" Child: mount");
+        if (!args->jail)
+            if (mount("none", "/proc", "", MS_REC|MS_PRIVATE, NULL) == -1)
+                perror(" Child: mount");
         if (mount("proc", "/proc", "proc", 0, NULL) == -1)
             perror(" Child: mount");
     }
