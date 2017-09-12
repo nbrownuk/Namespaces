@@ -196,7 +196,7 @@ int main(int argc, char *argv[])
         switch (option) {
             case 'c':
                 args.jail = 1;
-                args.path = malloc(sizeof(char *) * (strlen(optarg) + 1));
+                args.path = malloc(sizeof(char) * (strlen(optarg) + 1));
                 strcpy(args.path, optarg);
                 break;
             case 'i':
@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
                 break;
             case 'u':
                 flags |= CLONE_NEWUTS;
-                args.hostname = malloc(sizeof(char *) * (strlen(optarg) + 1));
+                args.hostname = malloc(sizeof(char) * (strlen(optarg) + 1));
                 strcpy(args.hostname, optarg);
                 break;
             case 'm':
