@@ -2,7 +2,7 @@
 
 This repository provides a set of C programs for exploring Linux namespaces. It starts out in a very basic form, implementing isolation via a PID namespace, and culminates in the implementation of a very basic container using a number of namespaces and a chroot filesystem. It's purpose is purely to demonstrate the use and effects of Linux namespaces, and is not meant for any other purpose. Head over to [Docker](https://github.com/docker/docker), [LXC](https://github.com/lxc/lxc) or [rkt](https://github.com/coreos/rocket) for industrial strength container capabilities.
 
-The source code was generated as part of some [blog articles](http://windsock.io) I wrote on namespaces.
+The source code was generated as part of some [blog articles](https://windsock.io) I wrote on namespaces.
 
 ## Source Specifics
 

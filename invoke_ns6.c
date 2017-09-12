@@ -12,7 +12,7 @@
 #include <time.h>
 
 
-// Define space for stack used by child process 
+// Define size of space for stack used by child process
 #define STACK_SIZE (64 * 1024)
 
 // Define message queue name
@@ -32,7 +32,7 @@ struct arguments {
 // Function to print command usage
 static void usage(char *prog)
 {
-    fprintf(stderr, "Usage: %s [options] [cmd [arg...]]\n", prog);
+    fprintf(stderr, "\nUsage: %s [options] [cmd [arg...]]\n", prog);
     fprintf(stderr, "Options can be:\n");
     fprintf(stderr, "    -h           display this help message\n");
     fprintf(stderr, "    -v           display verbose messages\n");
@@ -40,32 +40,32 @@ static void usage(char *prog)
     fprintf(stderr, "    -m           new MNT namespace\n");
     fprintf(stderr, "    -u hostname  new UTS namespace with associated hostname\n");
     fprintf(stderr, "    -n           new NET namespace\n");
-    fprintf(stderr, "    -i no|yes    create message queue in new IPC namespace (yes), or default namespace (no):\n");
+    fprintf(stderr, "    -i no|yes    create message queue in new IPC namespace (yes), or\n                 default namespace (no)\n");
     fprintf(stderr, "    -c dir       jail process in specified directory\n");
 }
- 
+
 
 // Prepare message queue
 mqd_t prepareMQ(void *child_args)
 {
     struct arguments *args = child_args;
-    mqd_t mq;
-    int oflags = O_CREAT | O_RDWR;
-    struct mq_attr attr;
+    mqd_t            mq;
+    int              oflags = O_CREAT | O_RDWR;
+    struct mq_attr   attr;
 
     attr.mq_flags   = 0;
     attr.mq_maxmsg  = 10;
-    attr.mq_msgsize = 60;
+    attr.mq_msgsize = 81;
     attr.mq_curmsgs = 0;
-    
+
     mq = mq_open(mq_name, oflags, 0644, &attr);
     if (mq != -1) {
         if (args->verbose)
             printf("Parent: opening message queue %s\n", mq_name);
-    }        
+    }
     else
-        perror("Parent: mq_open");
-    
+        perror("Parent: prepareMQ: mq_open");
+
     return mq;
 }
 
@@ -74,10 +74,10 @@ mqd_t prepareMQ(void *child_args)
 int childFunction(void *child_args)
 {
     struct arguments *args = child_args;
-    mqd_t mq;
-    int oflags = O_WRONLY;
-    struct mq_attr attr;
-    char *msg;
+    mqd_t            mq;
+    int              oflags = O_WRONLY;
+    struct mq_attr   attr;
+    char             *msg;
 
     if (args->verbose)
         printf(" Child: PID of child is %d\n", getpid());
@@ -90,91 +90,97 @@ int childFunction(void *child_args)
         if (mq != -1) {
             if (mq_getattr(mq, &attr) != -1) {
                 msg = malloc(attr.mq_msgsize);
-                printf("\n     Child: enter a message to send to the parent process (MAX 60 chars)\n     >> ");
+                printf("\n     Child: enter a message to send to the parent process (MAX 80 chars)\n     >> ");
                 if (fgets(msg, attr.mq_msgsize, stdin) != NULL) {
+                    msg[strcspn(msg, "\n")] = '\0';
                     printf("\n");
                     if (args->verbose)
                         printf(" Child: sending message to parent\n");
                     if (mq_send(mq, msg, attr.mq_msgsize,0) == -1)
-                        perror(" Child: mq_send");
+                        perror(" Child: childFunction: mq_send");
                 }
                 else
-                    perror(" Child: fgets");
+                    perror(" Child: childFunction: fgets");
                 if (args->verbose)
-                        printf(" Child: closing message queue %s\n", mq_name);
+                    printf(" Child: closing message queue %s\n", mq_name);
                 if (mq_close(mq) == -1)
-                    perror(" Child: mq_close");                    
-                free(msg);        
+                    perror(" Child: childFunction: mq_close");
+                free(msg);
             }
             else
-                perror(" Child: mq_getattr");
-        }        
+                perror(" Child: childFunction: mq_getattr");
+        }
         else
-            perror(" Child: mq_open");
+            perror(" Child: childFunction: mq_open");
     }
-    
+
     // If specified, place process in chroot jail
     if (args->jail) {
         if (args->verbose)
-            printf(" Child: creating chroot jail\n"); 
+            printf(" Child: creating chroot jail\n");
         if (chroot(args->path) == -1) {
-            perror(" Child: chroot");
+            perror(" Child: childFunction: chroot");
             exit(EXIT_FAILURE);
         }
         else {
             if (args->verbose)
-                printf(" Child: changing directory into chroot jail\n"); 
+                printf(" Child: changing directory into chroot jail\n");
             if (chdir("/") == -1) {
-                perror(" Child: chdir");
+                perror(" Child: childFunction: chdir");
                 exit(EXIT_FAILURE);
             }
             if (access("/proc", F_OK) != 0)
                 if (mkdir("/proc", 0555) == -1) {
-                    perror(" Child: mkdir");
+                    perror(" Child: childFunction: mkdir");
                     exit(EXIT_FAILURE);
-            }
+                }
         }
     }
-    
+
     // Mount new proc instance in new mount namespace if and only if
     // the child exists in both a new PID and MNT namespace
     if ((args->flags & CLONE_NEWPID) && (args->flags & CLONE_NEWNS)) {
         if (!args->jail)
             if (mount("none", "/proc", "", MS_REC|MS_PRIVATE, NULL) == -1)
-                perror(" Child: mount");
+                perror(" Child: childFunction: mount");
         if (mount("proc", "/proc", "proc", 0, NULL) == -1)
-            perror(" Child: mount");
+            perror(" Child: childFunction: mount");
     }
 
     // Set new hostname in UTS namespace if applicable
     if (args->flags & CLONE_NEWUTS)
         if (sethostname(args->hostname, strlen(args->hostname)) == -1)
-            perror(" Child: sethostname");
+            perror(" Child: childFunction: sethostname");
 
     // Execute command if given
     if (args->command != NULL) {
-        printf(" Child: Executing command %s ...\n", args->command[0]);
+        if (clearenv() != 0)
+            fprintf(stderr, " Child: childFunction: couldn't clear environment\n");
+        if (args->verbose)
+            printf(" Child: executing command %s ...\n", args->command[0]);
         execvp(args->command[0], &args->command[0]);
     }
     else
         exit(EXIT_SUCCESS);
 
-    perror(" Child: execv");
+    perror(" Child: childFunction: execvp");
     exit(EXIT_FAILURE);
 }
 
 
- 
+
 int main(int argc, char *argv[])
 {
-    char *child_stack;
-    int i, option, flags = 0;
-    pid_t child;
+    char             *child_stack;
+    int              i;
+    int              option;
+    int              flags = 0;
+    pid_t            child;
     struct arguments args;
-    mqd_t mq = 0;
-    struct mq_attr attr;
-    char *msg;
-    struct timespec timeout;
+    mqd_t            mq = 0;
+    struct mq_attr   attr;
+    char             *msg;
+    struct timespec  timeout;
 
     args.verbose = 0;
     args.flags = 0;
@@ -186,47 +192,47 @@ int main(int argc, char *argv[])
 
     // Parse command line options and construct arguments
     // to be passed to childFunction
-    while ((option = getopt(argc, argv, "+hvpmu:ni:c:")) != -1) {      
+    while ((option = getopt(argc, argv, "+hvpmu:ni:c:")) != -1) {
         switch (option) {
-        case 'c':
-            args.jail = 1;
-            args.path = malloc(sizeof(char *) * (strlen(optarg) + 1));
-            strcpy(args.path, optarg);
-            break;
-        case 'i':
-            if (strcmp("no", optarg) != 0 && strcmp("yes", optarg) != 0) {
-                fprintf(stderr, "%s: option requires valid argument -- 'i'\n", argv[0]);
+            case 'c':
+                args.jail = 1;
+                args.path = malloc(sizeof(char *) * (strlen(optarg) + 1));
+                strcpy(args.path, optarg);
+                break;
+            case 'i':
+                if (strcmp("no", optarg) != 0 && strcmp("yes", optarg) != 0) {
+                    fprintf(stderr, "%s: option requires valid argument -- 'i'\n", argv[0]);
+                    usage(argv[0]);
+                    exit(EXIT_FAILURE);
+                }
+                else
+                    if (strcmp("yes", optarg) == 0)
+                        flags |= CLONE_NEWIPC;
+                args.ipc = 1;
+                break;
+            case 'n':
+                flags |= CLONE_NEWNET;
+                break;
+            case 'u':
+                flags |= CLONE_NEWUTS;
+                args.hostname = malloc(sizeof(char *) * (strlen(optarg) + 1));
+                strcpy(args.hostname, optarg);
+                break;
+            case 'm':
+                flags |= CLONE_NEWNS;
+                break;
+            case 'p':
+                flags |= CLONE_NEWPID;
+                break;
+            case 'v':
+                args.verbose = 1;
+                break;
+            case 'h':
+                usage(argv[0]);
+                exit(EXIT_SUCCESS);
+            default:
                 usage(argv[0]);
                 exit(EXIT_FAILURE);
-            }
-            else
-                if (strcmp("yes", optarg) == 0)
-                    flags |= CLONE_NEWIPC;
-            args.ipc = 1;
-            break;    
-        case 'n':
-            flags |= CLONE_NEWNET;
-            break;
-        case 'u':
-            flags |= CLONE_NEWUTS;
-            args.hostname = malloc(sizeof(char *) * (strlen(optarg) + 1));
-            strcpy(args.hostname, optarg);
-            break;
-        case 'm':
-            flags |= CLONE_NEWNS;
-            break;
-        case 'p':
-            flags |= CLONE_NEWPID;
-            break;
-        case 'v':
-            args.verbose = 1;
-            break;
-        case 'h':
-            usage(argv[0]);
-            exit(EXIT_SUCCESS);
-        default:
-            usage(argv[0]);
-            exit(EXIT_FAILURE);
         }
     }
 
@@ -243,35 +249,35 @@ int main(int argc, char *argv[])
         args.command[argc - optind] = NULL;
     }
 
-      if (args.verbose)
+    if (args.verbose)
         printf("Parent: PID of parent is %d\n", getpid());
- 
+
     // Prepare message queue
     if (args.ipc) {
         mq = prepareMQ(&args);
         if (mq == -1)
             exit(EXIT_FAILURE);
     }
-    
+
     // Allocate heap for child's stack
     child_stack = malloc(STACK_SIZE);
     if (child_stack == NULL) {
-        perror("Parent: malloc");
+        perror("Parent: main: malloc");
         exit(EXIT_FAILURE);
     }
- 
-      // Clone child process
+
+    // Clone child process
     child = clone(childFunction, child_stack + STACK_SIZE, flags | SIGCHLD, &args);
     if (child == -1) {
-        perror("Parent: clone");
+        perror("Parent: main: clone");
         exit(EXIT_FAILURE);
     }
 
     if (args.verbose)
         printf("Parent: PID of child is %d\n", child);
- 
-     // Read message from child on message queue
-     if (args.ipc) {
+
+    // Read message from child on message queue
+    if (args.ipc) {
         if (clock_gettime(CLOCK_REALTIME, &timeout) == 0) {
             timeout.tv_sec += 60;
             if (mq_getattr(mq, &attr) != -1) {
@@ -282,19 +288,19 @@ int main(int argc, char *argv[])
                     printf("\n    Parent: the following message was received from the child\n     >> %s\n\n", msg);
                 }
                 else
-                    perror("Parent: mq_timedreceive");
-                free(msg);    
+                    perror("Parent: main: mq_timedreceive");
+                free(msg);
             }
             else
-                perror("Parent: mq_getattr");
+                perror("Parent: main: mq_getattr");
         }
         else
-            perror("Parent: clock_gettime");
-    }    
-    
-    // Wait for child to finish 
+            perror("Parent: main: clock_gettime");
+    }
+
+    // Wait for child to finish
     if (waitpid(child, NULL, 0) == -1) {
-        perror("Parent: waitpid");
+        perror("Parent: main: waitpid");
         exit(EXIT_FAILURE);
     }
 
@@ -303,11 +309,11 @@ int main(int argc, char *argv[])
         if (args.verbose)
             printf("Parent: closing message queue %s\n", mq_name);
         if (mq_close(mq) == -1)
-            perror("Parent: mq_close");
+            perror("Parent: main: mq_close");
         if (args.verbose)
-            printf("Parent: Removing message queue %s\n", mq_name);
+            printf("Parent: removing message queue %s\n", mq_name);
         if (mq_unlink(mq_name) == -1)
-            perror("Parent: mq_unlink");    
+            perror("Parent: main: mq_unlink");
     }
 
     if (args.verbose)

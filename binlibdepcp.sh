@@ -8,8 +8,8 @@
 # date           : 17-Mar-2015
 # version        : 1.0
 # usage          : bash binlibdepcp.sh <binary> <target>
-# notes          : 
-# bash_version   : GNU bash, version 4.3.11(1)-release (x86_64-pc-linux-gnu)
+# notes          :
+# bash_version   : GNU bash, version 4.4.12(1)-release (x86_64-pc-linux-gnu)
 # ============================================================================ #
 
 set -e
@@ -30,7 +30,7 @@ usage () {
 if [ "$#" -eq 1 -a "$1" = "-h" ]; then
     usage
     exit 0
-fi    
+fi
 
 # Otherwise, check for correct number of arguments
 if [ "$#" -lt 2 -o "$#" -gt 3 ]; then
@@ -76,11 +76,11 @@ if [ ! -d "$TARGET" -o ! -w "$TARGET" ]; then
     done
     if [ ! -w "$EXISTING_DIR" ]; then
         echo "$TARGET: no write permission at $EXISTING_DIR ...... aborting" >&2
-        exit 1 
+        exit 1
     else
         mkdir -p "$TARGET"
     fi
-fi    
+fi
 
 printf "Copying ...\n\n"
 
@@ -95,7 +95,7 @@ if [ -f "${TARGET}${BINARY}" -a "$NOCLOBBER" = true ]; then
 else
     cp -p "$BINARY" "${TARGET}$(dirname $BINARY)"
     printf "[OK]\n"
-fi    
+fi
 
 # Copy the libs to the target, retaining the full path name. NB don't
 # use --parents, it's not supported by BusyBox
@@ -107,7 +107,7 @@ if [ -n "$LIBS" ]; then
             mkdir -p "${TARGET}$(dirname $LIB)"
         fi
         if [ -f "${TARGET}${LIB}" -a "$NOCLOBBER" = true ]; then
-            printf "[SKIPPED]\n" 
+            printf "[SKIPPED]\n"
         else
             cp -p "$LIB" "${TARGET}$(dirname $LIB)"
             printf "[OK]\n"
